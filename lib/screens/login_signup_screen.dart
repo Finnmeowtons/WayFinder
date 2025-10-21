@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+import 'dart:math';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/login_signup_bloc/signup_login_bloc.dart';
 import 'map_screen.dart';
 
 class LoginSignupScreen extends StatefulWidget {
@@ -11,6 +14,28 @@ class LoginSignupScreen extends StatefulWidget {
 
 class _LoginSignupScreenState extends State<LoginSignupScreen> {
   bool _showOtpCard = false; // Toggle between login/signup and OTP screen
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+  String otp = "";
+  String phoneNumber = "";
+
+
+
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  void _toggleScreen() {
+    setState(() {
+      _showOtpCard = !_showOtpCard;
+    });
+  }
+
+  Future<String> _generateOtp() async { final random = Random(); return (100000 + random.nextInt(900000)).toString(); }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +45,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
           constraints: BoxConstraints.expand(),
           decoration: BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/landing.jpg'), // background image
+              image: AssetImage('assets/landing.jpg'),
               fit: BoxFit.cover,
             ),
           ),
@@ -33,11 +58,81 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
                     Image.asset(
                       'assets/icons/logo_name_white.png',
                       fit: BoxFit.fitWidth,
-                      // width: 300,
                       height: 200,
                     ),
                     SizedBox(height: 50),
-                    _showOtpCard ? _OtpCard(onBack: _toggleScreen) : _LoginSignupCard(onProceed: _toggleScreen),
+                    BlocConsumer<SignupLoginBloc, SignupLoginState>(
+                      listener: (context, state) {
+                        final messenger = ScaffoldMessenger.of(context);
+                        if (state is SignupLoginLoading) {
+                          // show loading indicator
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (BuildContext context) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                          );
+                        } else if (state is SignupLoginError) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(state.error)),
+                          );
+                          print("Error: ${state.error}");
+                        } else if (state is OTPRequested) {
+                          Navigator.pop(context);
+                          messenger.showSnackBar(
+                            SnackBar(content: Text(state.message)),
+                          );
+                          setState(() => _showOtpCard = true);
+                        } else if (state is UserConfirmed) {
+                          Navigator.pop(context);
+                          messenger.hideCurrentSnackBar();
+                          Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => MapScreen(phoneNumber: phoneNumber,)));
+                        }
+                      },
+                      builder: (context, state) {
+                        return _showOtpCard
+                            ? _OtpCard(
+                          otpController: _otpController,
+                          onBack: _toggleScreen,
+                          otp: otp,
+                          onConfirm: () {
+                            if(_otpController.text == otp) {
+                              context.read<SignupLoginBloc>().add(
+                                ConfirmUserRequested(
+                                    phoneNumber: _phoneController.text
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text("Invalid OTP")),
+                              );
+                            }
+                          },
+                        )
+                            : _LoginSignupCard(
+                          phoneController: _phoneController,
+                          onProceed: () async {
+                            otp = await _generateOtp();
+                            phoneNumber = _phoneController.text;
+                            print("OTP: $otp");
+                            context.read<SignupLoginBloc>().add(
+                              SignInRequested(
+                                phoneNumber: _phoneController.text,
+                                otp: otp,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -47,17 +142,23 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
       ),
     );
   }
-
-  void _toggleScreen() {
-    setState(() {
-      _showOtpCard = !_showOtpCard;
-    });
-  }
 }
 
-class _LoginSignupCard extends StatelessWidget {
+class _LoginSignupCard extends StatefulWidget {
   final VoidCallback onProceed;
-  const _LoginSignupCard({super.key, required this.onProceed});
+  final TextEditingController phoneController;
+  const _LoginSignupCard({
+    super.key,
+    required this.onProceed,
+    required this.phoneController,
+  });
+
+  @override
+  State<_LoginSignupCard> createState() => _LoginSignupCardState();
+}
+
+class _LoginSignupCardState extends State<_LoginSignupCard> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
@@ -70,22 +171,49 @@ class _LoginSignupCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              "Login / Sign Up",
-              style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF005A66)),
+            Column(
+              children: [
+                const Text(
+                  "Connect to",
+                  style: TextStyle(
+
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF005A66)),
+                ),
+                const Text(
+                  "WayFinder",
+                  style: TextStyle(
+
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF005A66)),
+                ),
+              ],
             ),
-            TextFormField(
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                label: Text("Enter contact number"),
+            Form(
+              key: _formKey,
+              child: TextFormField(
+                controller: widget.phoneController,
+                validator: (value) => (value == null || value.length != 11) ? 'Contact number must be 11 digits' : null,
+                maxLength: 11,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  label: Text("Enter contact number"),
+                ),
+                keyboardType: TextInputType.phone,
               ),
-              keyboardType: TextInputType.number,
-              // TODO: add controller and validation
             ),
             ElevatedButton(
-              onPressed: onProceed, // TODO: trigger OTP generation/login
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF005A66)),
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  widget.onProceed();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF005A66)),
               child: const Text("Proceed", style: TextStyle(color: Colors.white)),
             ),
           ],
@@ -95,9 +223,25 @@ class _LoginSignupCard extends StatelessWidget {
   }
 }
 
-class _OtpCard extends StatelessWidget {
+class _OtpCard extends StatefulWidget {
   final VoidCallback onBack;
-  const _OtpCard({super.key, required this.onBack});
+  final VoidCallback onConfirm;
+  final String otp;
+  final TextEditingController otpController;
+  const _OtpCard({
+    super.key,
+    required this.onBack,
+    required this.onConfirm,
+    required this.otp,
+    required this.otpController,
+  });
+
+  @override
+  State<_OtpCard> createState() => _OtpCardState();
+}
+
+class _OtpCardState extends State<_OtpCard> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
@@ -113,33 +257,38 @@ class _OtpCard extends StatelessWidget {
           children: [
             const Text(
               "Enter Your OTP",
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF005A66)),
+              style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF005A66)),
             ),
-            TextFormField(
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                label: Text("One Time Password"),
+            Form(
+              key: _formKey,
+              child: TextFormField(
+                controller: widget.otpController,
+                validator: (value) => (value == null || value.length != 6) ? 'OTP must be 6 digits' : (value != widget.otp) ? 'Invalid OTP' : null,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  label: Text("One Time Password"),
+                ),
+                keyboardType: TextInputType.number,
               ),
-              keyboardType: TextInputType.number,
-              // TODO: add controller
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                TextButton(
-                  onPressed: onBack,
-                  child: const Text("Back"),
-                ),
+                TextButton(onPressed: widget.onBack, child: const Text("Back")),
                 ElevatedButton(
-                  onPressed: () {
-                    // TODO: verify OTP and navigate to HomePage
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MapScreen()));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("OTP verified")),
-                    );
+                  onPressed:() {
+                    if (_formKey.currentState!.validate()) {
+                      widget.onConfirm();
+                    }
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF005A66)),
-                  child: const Text("Confirm", style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF005A66)),
+                  child:
+                  const Text("Confirm", style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),

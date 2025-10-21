@@ -1,20 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
-import 'package:way_finders/models/stick_model.dart';
+import 'package:way_finders/models/device_info_model.dart';
+import 'package:way_finders/repository/local_storage_repository.dart';
 import 'package:way_finders/screens/login_signup_screen.dart';
 import 'package:way_finders/widgets/map_widget.dart';
+import 'package:way_finders/widgets/sos_dialog.dart';
 import 'package:way_finders/widgets/stick_list_sheet.dart';
 
+import '../bloc/mqtt_bloc/mqtt_bloc.dart';
+import '../widgets/tutorial_helper.dart';
+
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final String phoneNumber;
+
+  const MapScreen({super.key, required this.phoneNumber});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
+  final GlobalKey keyBottomSheet = GlobalKey();
+  final GlobalKey keyMap = GlobalKey();
+  final GlobalKey keyLocation = GlobalKey();
   late final DraggableScrollableController sheetController;
   bool isLoading = false; // For progress overlay
+  bool _tutorialShown = false;
 
   @override
   void initState() {
@@ -22,81 +34,102 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
   }
 
+
   final MapController mapController = MapController(
     initPosition: GeoPoint(latitude: 12.8797, longitude: 121.7740), // PH center
   );
 
-  List<StickModel> sticks = [
-    StickModel(
-        id: 1, name: "Stick Alpha", latitude: 14.6091, longitude: 120.9822, location: "Manila"),
-    StickModel(
-        id: 2, name: "Stick Bravo", latitude: 14.6760, longitude: 121.0437, location: "Quezon City"),
-    StickModel(
-        id: 3, name: "Stick Charlie", latitude: 14.5547, longitude: 121.0244, location: "Makati")
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Map fills the screen
-          MapWidget(sticks: sticks, mapController: mapController),
+      key: keyMap,
+      body: BlocListener<MqttBloc, MqttState>(
+        listener: (context, state) {
+          if (state is MqttSOSReceived) {
+            print("SOS");
+            showSOSDialog(context, state.name);
+          }
+        },
+        child: Stack(
+          children: [
+            // Map fills the screen
+            MapWidget(
+              mapController: mapController,
+              onMapReady: () {
+                print("Map is Ready!!");
 
-          // Map buttons
-          Positioned(
-            bottom: 150,
-            left: 16,
-            child: Column(
-              children: [
-                _mapButton(icon: Icons.add, onTap: () => mapController.zoomIn()),
-                const SizedBox(height: 8),
-                _mapButton(icon: Icons.remove, onTap: () => mapController.zoomOut()),
-                const SizedBox(height: 8),
-                _mapButton(
-                    icon: Icons.my_location_rounded,
-                    onTap: () async => mapController.moveTo(await mapController.myLocation(), animate: true)),
-              ],
+                if (!_tutorialShown) {
+                  print("Tutorial now showing");
+                  MapTutorial(
+                    context: context,
+                    mapKey: keyMap,
+                    locationKey: keyLocation,
+                    bottomSheetKey: keyBottomSheet,
+                  ).show();
+                  _tutorialShown = true; // Make sure it only runs once
+                }
+              },
             ),
-          ),
 
-          // Logout button
-          Align(
-            alignment: Alignment.topRight,
-            child: _logOutWidget(),
-          ),
-
-          // Bottom Sheet
-          DraggableScrollableSheet(
-            controller: sheetController,
-            initialChildSize: 0.15,
-            minChildSize: 0.15,
-            maxChildSize: 0.8,
-            builder: (context, scrollController) {
-              return StickListSheet(
-                sticks: sticks,
-                mapController: mapController,
-                scrollController: scrollController, // Pass scrollController
-              );
-            },
-          ),
-
-          // Loading overlay
-          if (isLoading)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black45,
-                child: const Center(child: CircularProgressIndicator()),
+            // Map buttons
+            Positioned(
+              bottom: 150,
+              left: 16,
+              child: Column(
+                children: [
+                  _mapButton(icon: Icons.add, onTap: () => mapController.zoomIn()),
+                  const SizedBox(height: 8),
+                  _mapButton(icon: Icons.remove, onTap: () => mapController.zoomOut()),
+                  // _mapButton(icon: Icons.remove, onTap: () => showSOSDialog(context, "Kenth Marasigan")),
+                  const SizedBox(height: 8),
+                  _mapButton(
+                      icon: Icons.my_location_rounded,
+                      onTap: () async => mapController.moveTo(await mapController.myLocation(), animate: true),
+                      key: keyLocation),
+                ],
               ),
             ),
-        ],
+
+            // Logout button
+            Align(
+              alignment: Alignment.topRight,
+              child: _logOutWidget(),
+            ),
+
+            // Bottom Sheet
+            DraggableScrollableSheet(
+              controller: sheetController,
+              initialChildSize: 0.15,
+              minChildSize: 0.15,
+              maxChildSize: 0.8,
+              builder: (context, scrollController) {
+                return StickListSheet(
+                  key: keyBottomSheet,
+                  mapController: mapController,
+                  scrollController: scrollController,
+                  phoneNumber: widget.phoneNumber, // Pass scrollController
+                );
+              },
+            ),
+
+            // Loading overlay
+            if (isLoading)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black45,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
 
-  Widget _mapButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _mapButton({required IconData icon, required VoidCallback onTap, Key? key}) {
     return Container(
+      key: key,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -132,20 +165,24 @@ class _MapScreenState extends State<MapScreen> {
         onPressed: () async {
           final shouldLogout = await showDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text("Log out"),
-              content: const Text("Are you sure you want to log out?"),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text("Cancel"),
+            builder: (context) =>
+                AlertDialog(
+                  title: const Text("Log out"),
+                  content: const Text("Are you sure you want to log out?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.pop(context, true);
+                        LocalStorageRepository().clearData();
+                      },
+                      child: const Text("Log out"),
+                    ),
+                  ],
                 ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text("Log out"),
-                ),
-              ],
-            ),
           );
 
           if (shouldLogout == true) {
