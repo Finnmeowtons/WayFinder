@@ -89,7 +89,7 @@ class MqttBloc extends Bloc<MqttEvent, MqttState> {
           ));
         } else if (type == "sos"){
           print("Type SOS");
-          emit(MqttSOSReceived("Kenth Marasigan"));
+          emit(MqttSOSReceived(deviceUid));
         }
       } catch (e) {
         print('Invalid data format for $type: $e');

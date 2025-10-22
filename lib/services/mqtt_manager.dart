@@ -16,7 +16,7 @@ class MqttManager {
   final int port = 1884;
   final String clientId = 'wayfinder_client_${DateTime.now().millisecondsSinceEpoch}';
 
-  final Set<String> _subscribedTopics = {};
+  final Set<String> subscribedTopics = {};
   final List<String> _pendingSubscriptions = [];
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
 
@@ -91,11 +91,11 @@ class MqttManager {
   }
 
   void subscribe(String topic) {
-    if (_subscribedTopics.contains(topic)) return;
+    if (subscribedTopics.contains(topic)) return;
 
     if (isConnected) {
       client!.subscribe(topic, MqttQos.atLeastOnce);
-      _subscribedTopics.add(topic);
+      subscribedTopics.add(topic);
       print("🟢 Subscribed to $topic");
     } else {
       // queue the subscription for later

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
+import 'package:way_finders/ip_address.dart';
 import 'package:way_finders/models/device_with_status.dart';
 import '../bloc/device_bloc/device_bloc.dart';
 
@@ -109,8 +110,9 @@ class _MapWidgetState extends State<MapWidget> {
           ),
           child: CircleAvatar(
             radius: 64,
-            backgroundImage: AssetImage("assets/kenth.jpg"),
-            // NetworkImage(device.deviceInfo.profilePic!),
+            backgroundImage:device.deviceInfo.profilePic != null
+                ? NetworkImage("${IpAddress.ipAddress}${device.deviceInfo.profilePic}")
+                : null,
           ),
         ),
       ),

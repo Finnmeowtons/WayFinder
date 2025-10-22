@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:vibration/vibration.dart';
 
-Future<void> showSOSDialog(BuildContext context, String name) async {
+Future<void> showSOSDialog(BuildContext context, String name, String location) async {
   Vibration.vibrate(pattern: [0, 500, 200, 500]);
   showDialog(
     context: context,
@@ -15,7 +15,6 @@ Future<void> showSOSDialog(BuildContext context, String name) async {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Animated alert icon (you can use a Lottie JSON or fallback to Icon)
             SizedBox(
               height: 100,
               child: Icon(
@@ -59,7 +58,7 @@ Future<void> showSOSDialog(BuildContext context, String name) async {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "Last known location: JJC-1 Apartment, Dagupan City",
+                      location.isEmpty ? "Last known location: Dagupan City" : "Last known location: $location",
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade700,
@@ -74,26 +73,6 @@ Future<void> showSOSDialog(BuildContext context, String name) async {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // FilledButton(
-                //   style: FilledButton.styleFrom(
-                //     backgroundColor: Colors.red.shade700,
-                //     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                //     shape: RoundedRectangleBorder(
-                //       borderRadius: BorderRadius.circular(16),
-                //     ),
-                //   ),
-                //   onPressed: () {
-                //     Navigator.pop(context);
-                //     // Trigger emergency contact / call
-                //   },
-                //   child: const Row(
-                //     children: [
-                //       Icon(Icons.call_rounded, color: Colors.white),
-                //       SizedBox(width: 6),
-                //       Text("Call Now"),
-                //     ],
-                //   ),
-                // ),
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: Colors.grey.shade400),

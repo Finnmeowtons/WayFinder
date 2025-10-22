@@ -1,24 +1,35 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:swipeable_tile/swipeable_tile.dart';
+import 'package:way_finders/format_phone_number.dart';
+import 'package:way_finders/ip_address.dart';
 import 'package:way_finders/models/device_with_status.dart';
+import 'package:way_finders/services/mqtt_manager.dart';
+import 'package:way_finders/widgets/show_edit_dialog.dart';
 
 import '../bloc/device_bloc/device_bloc.dart';
 import '../bloc/mqtt_bloc/mqtt_bloc.dart';
 import '../models/device_info_model.dart';
+import '../repository/local_storage_repository.dart';
+import 'stick_tile.dart';
 import 'add_stick_dialog.dart';
 
 class StickListSheet extends StatefulWidget {
   final String phoneNumber;
   final MapController mapController;
   final ScrollController scrollController;
+  final DraggableScrollableController sheetController;
 
   const StickListSheet({
     super.key,
     required this.phoneNumber,
     required this.mapController,
     required this.scrollController,
+    required this.sheetController,
   });
 
   @override
@@ -26,56 +37,16 @@ class StickListSheet extends StatefulWidget {
 }
 
 class _StickListSheetState extends State<StickListSheet> {
-  late final DraggableScrollableController sheetController;
+  final Set<String> subscribedDevices = MqttManager().subscribedTopics;
+
 
   @override
   void initState() {
     super.initState();
-    sheetController = DraggableScrollableController();
 
     // Fetch user devices on initialization
     print("Phone number: ${widget.phoneNumber}");
-    context.read<DeviceBloc>().add(GetUserDevicesEvent(widget.phoneNumber));
-  }
-
-  void _editStick(DeviceInfoModel stick) {
-    final nameController = TextEditingController(text: stick.name);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Edit Stick"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Full Name"),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                // handle profile pic change
-              },
-              icon: const Icon(Icons.image),
-              label: const Text("Change Profile Picture"),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: send update event or API call
-              Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
+    context.read<DeviceBloc>().add(GetUserDevicesEvent(phoneNumber: widget.phoneNumber));
   }
 
   @override
@@ -91,7 +62,10 @@ class _StickListSheetState extends State<StickListSheet> {
           final mqttBloc = context.read<MqttBloc>();
 
           for (var d in sticks) {
-            mqttBloc.add(MqttSubscribeDeviceEvent(d.deviceInfo.deviceUid));
+            if (!subscribedDevices.contains(d.deviceInfo.deviceUid)) {
+              mqttBloc.add(MqttSubscribeDeviceEvent(d.deviceInfo.deviceUid));
+              subscribedDevices.add(d.deviceInfo.deviceUid);
+            }
           }
 
           return Container(
@@ -103,7 +77,7 @@ class _StickListSheetState extends State<StickListSheet> {
             child: Column(
               children: [
                 Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  margin: const EdgeInsets.symmetric(vertical: 12),
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
@@ -112,29 +86,74 @@ class _StickListSheetState extends State<StickListSheet> {
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
+                  child: CustomScrollView(
                     controller: widget.scrollController,
-                    padding: const EdgeInsets.only(top: 8),
-                    itemCount: sticks.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index < sticks.length) {
-                        final stick = sticks[index];
-                        return _swipeableTile(stick);
-                      } else {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 32.0),
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              showUserFormDialog(context);
+                    slivers: [
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 8),
+                      ),
+                      SliverList.builder(
+                        itemCount: sticks.length,
+                        itemBuilder: (context, index) {
+                          final stick = sticks[index];
+                          return StickTile(
+                            stick: stick,
+                            onTap: () {
+                              final lat = stick.location?.latitude;
+                              final lng = stick.location?.longitude;
+
+                              if (lat != null && lng != null) {
+                                widget.mapController.moveTo(GeoPoint(latitude: lat, longitude: lng), animate: true);
+
+                                widget.sheetController.animateTo(
+                                  0.15,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOut,
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("No location data available for this device.")),
+                                );
+                              }
                             },
-                            icon: const Icon(Icons.add),
-                            label: const Text("Add Stick"),
-                          ),
-                        );
-                      }
-                    },
+                            onEdit: () async {
+                              final formData = await showEditStickDialog(
+                                context,
+                                userDeviceId: stick.deviceInfo.id,
+                                deviceUid: stick.deviceInfo.deviceUid,
+                                currentName: stick.deviceInfo.name ?? "Stick",
+                                currentImageUrl: stick.deviceInfo.profilePic,
+                              );
+
+                              if (formData != null) {
+                                if (formData['action'] == 'delete') {
+                                  context.read<DeviceBloc>().add(
+                                    DisconnectDeviceEvent(id: stick.deviceInfo.id),
+                                  );
+                                } else {
+                                  final image = formData['image'];
+                                  context.read<DeviceBloc>().add(
+                                    EditDeviceEvent(
+                                      id: stick.deviceInfo.id,
+                                      name: formData['name'],
+                                      imageFile: image != null ? File(image) : null,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          );
+                        },
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 32.0),
+                          child: addStickButton(context)
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                )
               ],
             ),
           );
@@ -149,57 +168,44 @@ class _StickListSheetState extends State<StickListSheet> {
     );
   }
 
-  Widget _swipeableTile(DeviceWithStatus stick) {
-    return SwipeableTile.swipeToTrigger(
-      key: ValueKey(stick.deviceInfo.id),
-      color: Colors.white,
-      swipeThreshold: 0.2,
-      direction: SwipeDirection.endToStart,
-      behavior: HitTestBehavior.translucent,
-      onSwiped: (direction) {
-        if (direction == SwipeDirection.endToStart) {
-          _editStick(stick.deviceInfo);
-        }
-      },
-      backgroundBuilder: (context, direction, progress) {
-        if (direction == SwipeDirection.endToStart) {
-          return Container(
-            color: Colors.blueAccent,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: const Icon(Icons.settings, color: Colors.white),
-          );
-        }
-        return Container();
-      },
-      child: InkWell(
-        onTap: () async {
-          await widget.mapController.moveTo(
-            GeoPoint(latitude: stick.location!.latitude, longitude: stick.location!.longitude),
-            animate: true,
-          );
-          await sheetController.animateTo(
-            0.15,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        },
-        child: ListTile(
-          leading: CircleAvatar(
-            radius: 24,
-            backgroundImage:
-            AssetImage("assets/kenth.jpg"),
-            // NetworkImage(stick.deviceInfo.profilePic ?? "https://preview.redd.it/l0ergarfzst61.png?auto=webp&s=5de076eac09bb645d58b11cd8ce82f99ec487329", ),
-            child: null,
+  Widget addStickButton(BuildContext context) {
+    return
+      Card(
+        elevation: 0,
+        color: Colors.white,
+        child: InkWell(
+          onTap: () async {
+            final formData = await showUserFormDialog(context);
+            if (formData != null) {
+              final phone = await LocalStorageRepository().getPhoneNumber();
+              final formattedPhone = FormatPhoneNumber().formatPhoneNumber(phone!);
+              context.read<DeviceBloc>().add(
+                ConnectDeviceEvent(
+                  name: formData['name'],
+                  phoneNumber: formattedPhone,
+                  deviceNumber: formData['deviceUid'],
+                  password: formData['password'],
+                  imageFile: formData['image'] != null ? File(formData['image']) : null,
+                ),
+              );
+            }
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: 120,
+            height: 120,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.add_circle_outline, size: 40, color: Colors.blueAccent),
+                SizedBox(height: 8),
+                Text("Add Device",
+                    style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
-          title:
-          Text("Kenth Marasigan"),
-          // Text(stick.deviceInfo.name ?? "stick"),
-          subtitle:
-          Text("Distance: 1332m")
-          // Text("${stick.deviceInfo.id}"),
         ),
-      ),
-    );
+      );
   }
+
 }

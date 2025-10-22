@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:way_finders/repository/local_storage_repository.dart';
 import 'package:way_finders/services/mqtt_manager.dart';
 import '../../models/device_geocode_model.dart';
+import '../../models/device_info_model.dart';
 import '../../models/device_location_model.dart';
 import '../../models/device_with_status.dart';
 import '../../repository/device_repository.dart';
@@ -19,9 +23,11 @@ class DeviceBloc extends Bloc<DeviceEvent, DeviceState> {
       emit(DeviceLoading());
       try {
         await deviceRepository.connectDevice(
+          event.name,
           event.phoneNumber,
           event.deviceNumber,
           event.password,
+          event.imageFile
         );
         print( "Loading");
         final result = await deviceRepository.getUserDevices(event.phoneNumber);
@@ -50,16 +56,38 @@ class DeviceBloc extends Bloc<DeviceEvent, DeviceState> {
       }
     });
 
+    // Edit device
+    on<EditDeviceEvent>((event, emit) async {
+      emit(DeviceLoading());
+      try {
+        // Call repository to edit device
+        await deviceRepository.editDevice(event.id, event.name, event.imageFile);
+
+        // Refresh user's devices after edit
+        final phoneNumber = await LocalStorageRepository().getPhoneNumber();
+        final devices = await deviceRepository.getUserDevices(phoneNumber!);
+
+        final devicesWithStatus = devices
+            .map<DeviceWithStatus>((d) => DeviceWithStatus(deviceInfo: d))
+            .toList();
+
+        emit(DeviceLoaded(devicesWithStatus));
+      } catch (e) {
+        print(e.toString());
+        emit(DeviceError(e.toString()));
+      }
+    });
+
     // Disconnect device
     on<DisconnectDeviceEvent>((event, emit) async {
       emit(DeviceLoading());
       try {
         await deviceRepository.disconnectDevice(
-          event.phoneNumber,
-          event.deviceNumber,
+          event.id
         );
 
-        final devices = await deviceRepository.getUserDevices(event.phoneNumber);
+        final phoneNumber = await LocalStorageRepository().getPhoneNumber();
+        final devices = await deviceRepository.getUserDevices(phoneNumber!);
         final devicesWithStatus =
         devices.map<DeviceWithStatus>((d) => DeviceWithStatus(deviceInfo: d)).toList();
         emit(DeviceLoaded(devicesWithStatus));

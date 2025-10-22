@@ -82,6 +82,7 @@ flutter:
     - assets/profile_picture_default.jpg
     - assets/landing.jpg
     - assets/kenth.jpg
+    - assets/default.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

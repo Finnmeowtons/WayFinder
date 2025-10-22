@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
-Future<void> showUserFormDialog(BuildContext context) async {
+Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool obscurePassword = true;
   File? selectedImage;
 
-  await showDialog(
+  return await showDialog<Map<String, dynamic>>(
     context: context,
     barrierDismissible: false,
     builder: (context) {
@@ -21,7 +21,7 @@ Future<void> showUserFormDialog(BuildContext context) async {
             ),
             backgroundColor: Colors.white,
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -71,8 +71,8 @@ Future<void> showUserFormDialog(BuildContext context) async {
                     TextField(
                       controller: nameController,
                       decoration: InputDecoration(
-                        labelText: "Full Name",
-                        prefixIcon: const Icon(Icons.person_outline),
+                        labelText: "Name",
+                        prefixIcon: const Icon(Icons.person_outline_rounded),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -88,8 +88,8 @@ Future<void> showUserFormDialog(BuildContext context) async {
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
                       decoration: InputDecoration(
-                        labelText: "Phone Number *",
-                        prefixIcon: const Icon(Icons.phone_outlined),
+                        labelText: "Device UID *",
+                        prefixIcon: const Icon(Icons.fingerprint_rounded),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -106,7 +106,7 @@ Future<void> showUserFormDialog(BuildContext context) async {
                       obscureText: obscurePassword,
                       decoration: InputDecoration(
                         labelText: "Password *",
-                        prefixIcon: const Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
                           icon: Icon(
                             obscurePassword
@@ -150,7 +150,7 @@ Future<void> showUserFormDialog(BuildContext context) async {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: () async {
                             if (phoneController.text.isEmpty ||
                                 passwordController.text.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -164,7 +164,7 @@ Future<void> showUserFormDialog(BuildContext context) async {
                             }
                             Navigator.pop(context, {
                               'name': nameController.text,
-                              'phone': phoneController.text,
+                              'deviceUid': phoneController.text,
                               'password': passwordController.text,
                               'image': selectedImage?.path,
                             });

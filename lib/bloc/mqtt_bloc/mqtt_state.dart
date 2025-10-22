@@ -11,11 +11,13 @@ class MqttInitial extends MqttState {}
 class MqttConnected extends MqttState {}
 
 class MqttSOSReceived extends MqttState {
-  final String name;
-  const MqttSOSReceived(this.name);
+  final String deviceUid;
+  final DateTime timestamp;
+
+  MqttSOSReceived(this.deviceUid) : timestamp = DateTime.now();
 
   @override
-  List<Object?> get props => [name];
+  List<Object?> get props => [deviceUid];
 }
 
 class MqttLocationUpdated extends MqttState {

@@ -7,21 +7,31 @@ sealed class DeviceEvent extends Equatable {
 }
 
 final class ConnectDeviceEvent extends DeviceEvent {
+  final String name;
   final String phoneNumber;
   final String deviceNumber;
   final String password;
-  const ConnectDeviceEvent(this.phoneNumber, this.deviceNumber, this.password);
+  final File? imageFile;
+
+  const ConnectDeviceEvent({ required this.name, required this.phoneNumber, required this.deviceNumber, required this.password, this.imageFile});
 }
 
 final class GetUserDevicesEvent extends DeviceEvent {
   final String phoneNumber;
-  const GetUserDevicesEvent(this.phoneNumber);
+  const GetUserDevicesEvent({ required this.phoneNumber});
 }
 
 final class DisconnectDeviceEvent extends DeviceEvent {
-  final String phoneNumber;
-  final String deviceNumber;
-  const DisconnectDeviceEvent(this.phoneNumber, this.deviceNumber);
+  final int id;
+  const DisconnectDeviceEvent({required this.id});
+}
+
+class EditDeviceEvent extends DeviceEvent {
+  final int id;
+  final String name;
+  final File? imageFile;
+
+  const EditDeviceEvent({required this.id, required this.name, this.imageFile});
 }
 
 // New event for MQTT updates
