@@ -99,9 +99,11 @@ class DeviceBloc extends Bloc<DeviceEvent, DeviceState> {
     // Handle MQTT updates
     on<MqttDeviceUpdateEvent>((event, emit) {
       print("Updating device ${event.deviceId}");
-        final currentDevices = (state as DeviceLoaded).data;
-        print( "Current devices $currentDevices");
-        final updatedDevices = currentDevices.map((d) {
+      final currentState = state as DeviceLoaded;
+      final devices = currentState.data;
+
+      print( "Current devices $devices");
+        final updatedDevices = devices.map((d) {
           print( "Updating device2 $d, Event ${event.location}, ${event.geocode}, ${event.deviceId}");
           if (d.deviceInfo.deviceUid == "+${event.deviceId}") {
             print( "Event Location: ${event.location}, Device Location: ${d.location}");

@@ -58,7 +58,7 @@ class _StickListSheetState extends State<StickListSheet> {
         }
 
         if (state is DeviceLoaded) {
-          final sticks = state.data;
+          final sticks = List<DeviceWithStatus>.from(state.data);
           final mqttBloc = context.read<MqttBloc>();
 
           for (var d in sticks) {
@@ -86,12 +86,12 @@ class _StickListSheetState extends State<StickListSheet> {
                   ),
                 ),
                 Expanded(
-                  child: CustomScrollView(
+                  child: sticks.isEmpty
+                      ? Center(child: addStickButton(context))
+                      : CustomScrollView(
                     controller: widget.scrollController,
                     slivers: [
-                      const SliverToBoxAdapter(
-                        child: SizedBox(height: 8),
-                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
                       SliverList.builder(
                         itemCount: sticks.length,
                         itemBuilder: (context, index) {
@@ -145,19 +145,21 @@ class _StickListSheetState extends State<StickListSheet> {
                           );
                         },
                       ),
+                      // 👇 Always show add button after the list
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 32.0),
-                          child: addStickButton(context)
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(child: addStickButton(context)),
                         ),
                       ),
                     ],
                   ),
-                )
+                ),
               ],
             ),
           );
-                }
+
+        }
 
         if (state is DeviceError) {
           return Center(child: Text("Error: ${state.message}"));

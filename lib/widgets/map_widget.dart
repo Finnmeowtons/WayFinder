@@ -109,10 +109,10 @@ class _MapWidgetState extends State<MapWidget> {
             ],
           ),
           child: CircleAvatar(
-            radius: 64,
-            backgroundImage:device.deviceInfo.profilePic != null
-                ? NetworkImage("${IpAddress.ipAddress}${device.deviceInfo.profilePic}")
-                : null,
+            radius: 24,
+            backgroundImage: device.deviceInfo.profilePic != null ? NetworkImage("${IpAddress.ipAddress}${device.deviceInfo.profilePic}") : null,
+            backgroundColor: Colors.grey[200],
+            child: device.deviceInfo.profilePic == null ? const Icon(Icons.person) : null,
           ),
         ),
       ),

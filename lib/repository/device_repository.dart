@@ -48,22 +48,32 @@ class DeviceRepository {
   }
 
   Future<List<DeviceInfoModel>> getUserDevices(String phoneNumber) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/get-devices'),
-      headers: {"Content-Type": "application/json"},
-      body: json.encode({'phoneNumber': phoneNumber}),
-    );
-    print("RESPONSE: ${response.body}");
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/get-devices'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({'phoneNumber': phoneNumber}),
+      );
 
-    if (response.statusCode == 200 || response.statusCode == 202) {
-      print("DATA: ${response.body}");
+      print("RESPONSE (${response.statusCode}): ${response.body}");
 
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => DeviceInfoModel.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to get devices: ${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 202) {
+        final decoded = jsonDecode(response.body);
+
+        final List<dynamic> data = decoded is List
+            ? decoded
+            : (decoded['devices'] ?? []); // fallback if wrapped inside an object
+
+        return data.map((json) => DeviceInfoModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to get devices (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      print("Error in getUserDevices: $e");
+      rethrow;
     }
   }
+
 
   Future<Map<String, dynamic>> editDevice(
       int id,
