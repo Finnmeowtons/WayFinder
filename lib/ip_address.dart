@@ -1,5 +1,5 @@
 class IpAddress {
   static String get ipAddress{
-    return "http://10.35.85.138:3000";
+    return "http://192.168.68.111:3000";
   }
 }

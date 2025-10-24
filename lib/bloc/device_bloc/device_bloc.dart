@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bloc/bloc.dart';
@@ -27,24 +28,59 @@ class DeviceBloc extends Bloc<DeviceEvent, DeviceState> {
           event.phoneNumber,
           event.deviceNumber,
           event.password,
-          event.imageFile
+          event.imageFile,
         );
-        print( "Loading");
+
         final result = await deviceRepository.getUserDevices(event.phoneNumber);
-        // Wrap result into DeviceWithStatus
-        final devicesWithStatus = result.map<DeviceWithStatus>((d) => DeviceWithStatus(deviceInfo: d)).toList();
+        final devicesWithStatus = result
+            .map<DeviceWithStatus>((d) => DeviceWithStatus(deviceInfo: d))
+            .toList();
+
         emit(DeviceLoaded(devicesWithStatus));
       } catch (e) {
-        emit(DeviceError(e.toString()));
+        // Parse the message if it's from your API
+        String errorMessage = "Unknown error";
+        if (e.toString().contains('Device not found')) {
+          errorMessage = "Device not found.";
+        } else if (e.toString().contains('password')) {
+          errorMessage = "Incorrect password.";
+        } else if (e.toString().contains('already connected')) {
+          errorMessage = "Device is already connected.";
+        } else {
+          // Optionally, try parsing JSON from the API response
+          try {
+            final jsonBody = jsonDecode(
+              e.toString().replaceFirst('Exception: ', ''),
+            );
+            if (jsonBody['error'] != null) {
+              errorMessage = jsonBody['error'];
+            }
+          } catch (_) {}
+        }
+
+        // Emit the dialog state with previous devices so bottom sheet stays
+        emit(DeviceShowDialog(
+          errorMessage,
+          previousDevices: (state is DeviceLoaded) ? (state as DeviceLoaded).data : [],
+        ));
+
+        // Refresh the device list even after showing the dialog
+        final result = await deviceRepository.getUserDevices(event.phoneNumber);
+        final devicesWithStatus = result
+            .map<DeviceWithStatus>((d) => DeviceWithStatus(deviceInfo: d))
+            .toList();
+
+        emit(DeviceLoaded(devicesWithStatus));
       }
     });
+
 
     // Get user devices
     on<GetUserDevicesEvent>((event, emit) async {
       emit(DeviceLoading());
       try {
         final devices = await deviceRepository.getUserDevices(event.phoneNumber);
-
+        print("Devices: $devices");
         // Wrap into DeviceWithStatus
         final devicesWithStatus =
         devices.map<DeviceWithStatus>((d) => DeviceWithStatus(deviceInfo: d)).toList();

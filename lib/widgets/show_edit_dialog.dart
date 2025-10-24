@@ -98,6 +98,22 @@ Future<Map<String, dynamic>?> showEditStickDialog(
                     // Name field
                     TextField(
                       controller: nameController,
+                      onSubmitted: (_){
+                        if (nameController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Device name cannot be empty."),
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.pop(context, {
+                          'action': 'edit',
+                          'id': userDeviceId,
+                          'name': nameController.text,
+                          'image': selectedImage?.path,
+                        });
+                      },
                       decoration: InputDecoration(
                         labelText: "Name",
                         prefixIcon: const Icon(Icons.person_outline_rounded),

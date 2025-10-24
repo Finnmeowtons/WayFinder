@@ -39,6 +39,7 @@ class DeviceRepository {
 
     // convert streamed response to normal response
     final responseBody = await http.Response.fromStream(response);
+    print("RESPONSE (${response.statusCode}): ${responseBody.body}");
 
     if (response.statusCode == 200) {
       return jsonDecode(responseBody.body);
@@ -49,6 +50,7 @@ class DeviceRepository {
 
   Future<List<DeviceInfoModel>> getUserDevices(String phoneNumber) async {
     try {
+      print("Trying Getting user devices");
       final response = await http.post(
         Uri.parse('$baseUrl/get-devices'),
         headers: {"Content-Type": "application/json"},

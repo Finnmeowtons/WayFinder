@@ -4,8 +4,13 @@ import 'package:image_picker/image_picker.dart';
 
 Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController deviceUidController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  final FocusNode nameFocus = FocusNode();
+  final FocusNode deviceUidFocus = FocusNode();
+  final FocusNode passwordFocus = FocusNode();
+
   bool obscurePassword = true;
   File? selectedImage;
 
@@ -45,8 +50,7 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                     // Image picker
                     GestureDetector(
                       onTap: () async {
-                        final picked = await ImagePicker()
-                            .pickImage(source: ImageSource.gallery);
+                        final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
                         if (picked != null) {
                           setState(() => selectedImage = File(picked.path));
                         }
@@ -54,14 +58,9 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                       child: CircleAvatar(
                         radius: 45,
                         backgroundColor: Colors.blue.shade50,
-                        backgroundImage:
-                        selectedImage != null ? FileImage(selectedImage!) : null,
+                        backgroundImage: selectedImage != null ? FileImage(selectedImage!) : null,
                         child: selectedImage == null
-                            ? Icon(
-                          Icons.camera_alt_rounded,
-                          size: 36,
-                          color: Colors.blue.shade400,
-                        )
+                            ? Icon(Icons.camera_alt_rounded, size: 36, color: Colors.blue.shade400)
                             : null,
                       ),
                     ),
@@ -70,6 +69,9 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                     // Name field
                     TextField(
                       controller: nameController,
+                      focusNode: nameFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(context).requestFocus(deviceUidFocus),
                       decoration: InputDecoration(
                         labelText: "Name",
                         prefixIcon: const Icon(Icons.person_outline_rounded),
@@ -83,10 +85,13 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                     ),
                     const SizedBox(height: 16),
 
-                    // Phone field
+                    // Device UID field
                     TextField(
-                      controller: phoneController,
+                      controller: deviceUidController,
+                      focusNode: deviceUidFocus,
                       keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(context).requestFocus(passwordFocus),
                       decoration: InputDecoration(
                         labelText: "Device UID *",
                         prefixIcon: const Icon(Icons.fingerprint_rounded),
@@ -103,18 +108,28 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                     // Password field
                     TextField(
                       controller: passwordController,
+                      focusNode: passwordFocus,
                       obscureText: obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) {
+                        if (deviceUidController.text.isNotEmpty &&
+                            passwordController.text.isNotEmpty) {
+                          Navigator.pop(context, {
+                            'name': nameController.text,
+                            'deviceUid': deviceUidController.text,
+                            'password': passwordController.text,
+                            'image': selectedImage?.path,
+                          });
+                        }
+                      },
                       decoration: InputDecoration(
                         labelText: "Password *",
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
-                          ),
-                          onPressed: () =>
-                              setState(() => obscurePassword = !obscurePassword),
+                          icon: Icon(obscurePassword
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () => setState(() => obscurePassword = !obscurePassword),
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade100,
@@ -133,8 +148,7 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                         OutlinedButton(
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -144,32 +158,27 @@ Future<Map<String, dynamic>?> showUserFormDialog(BuildContext context) async {
                         FilledButton(
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.blueAccent,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          onPressed: () async {
-                            if (phoneController.text.isEmpty ||
+                          onPressed: () {
+                            if (deviceUidController.text.isEmpty ||
                                 passwordController.text.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    "Phone number and password are required.",
-                                  ),
-                                ),
+                                const SnackBar(content: Text("Device UID and password are required.")),
                               );
                               return;
                             }
                             Navigator.pop(context, {
                               'name': nameController.text,
-                              'deviceUid': phoneController.text,
+                              'deviceUid': deviceUidController.text,
                               'password': passwordController.text,
                               'image': selectedImage?.path,
                             });
                           },
-                          child: const Text("Save"),
+                          child: const Text("Add"),
                         ),
                       ],
                     ),

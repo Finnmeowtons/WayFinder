@@ -101,7 +101,7 @@ class MapTutorial {
         contents: [
           TargetContent(
             align: ContentAlign.top,
-            child: Text("Swipe up to view your list of connected sticks.", style: tutorialTextStyle()),
+            child: Text("Swipe up to view your list of connected sticks. You can scroll through multiple devices and swipe left on any device to edit it.", style: tutorialTextStyle()),
           ),
         ],
       ),

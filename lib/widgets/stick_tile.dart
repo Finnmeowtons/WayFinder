@@ -9,11 +9,12 @@ import '../models/device_with_status.dart';
 
 class StickTile extends StatefulWidget {
   final DeviceWithStatus stick;
+  final String? subtitle;
   final VoidCallback? onEdit;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
-  const StickTile({super.key, required this.stick, this.onTap, this.onEdit, this.onDelete});
+  const StickTile({super.key, required this.stick, this.subtitle,  this.onTap, this.onEdit, this.onDelete});
 
   @override
   State<StickTile> createState() => _StickTileState();
@@ -65,7 +66,7 @@ class _StickTileState extends State<StickTile> {
               child: device.profilePic == null ? const Icon(Icons.person) : null,
             ),
             title: Text(device.name ?? "Stick"),
-            subtitle: Text(widget.stick.geocode?.location ?? "", style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis,),
+            subtitle: Text(widget.subtitle ?? "", style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis,),
             // trailing: IconButton(
             //   icon: const Icon(Icons.edit),
             //   onPressed: widget.onEdit,

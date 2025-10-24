@@ -21,6 +21,12 @@ class DeviceLoaded extends DeviceState {
   List<Object> get props => [data, updatedAt];
 }
 
+class DeviceShowDialog extends DeviceState {
+  final String message;
+  final List<DeviceWithStatus>? previousDevices;
+  const DeviceShowDialog(this.message, {this.previousDevices});
+}
+
 final class DeviceError extends DeviceState {
   final String message;
   const DeviceError(this.message);
